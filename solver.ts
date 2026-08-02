@@ -1,4 +1,5 @@
-import { GameState, ScoringKey, scoringKeys, TurnComputer } from "./turn-computer";
+import { TurnComputer } from "./turn-computer";
+import { gameStateToString, ScoringKey, scoringKeys } from "./types";
 
 function getBoardStates(target: number) {
   const result: ScoringKey[][] = [];
@@ -21,30 +22,15 @@ function getBoardStates(target: number) {
 }
 
 
-function gameStateToString(gameState: GameState): string {
-  let s = ''
-  for (let i = 0; i <= 13; i++) {
-    if (gameState.openFields.includes(scoringKeys[i])) {
-      s += '1';
-    } else {
-      s += '0';
-    }
-  }
-  s += ":"
-  s += gameState.cappedUpperBonus.toString();
-  return s;
-}
-
-
 function solve() {
   const expectedScores = new Map<string, number>();
 
   for (let i = 0; i <= 13; i++) {
     const boardStates = getBoardStates(i);
     for (const boardState of boardStates) {
-      for (let cappedUpperBonus = 0; cappedUpperBonus <= 63; cappedUpperBonus++) {
+      for (let cappedUpperScore = 0; cappedUpperScore <= 63; cappedUpperScore++) {
         const gameState = {
-          cappedUpperBonus: cappedUpperBonus,
+          cappedUpperScore,
           openFields: boardState,
         };
         const key = gameStateToString(gameState);
@@ -53,10 +39,8 @@ function solve() {
           continue;
         }
 
-
-
-        if (gameState.openFields.length === 1) {
-          const turnComputer = new TurnComputer(gameState, false);
+        if (gameState.openFields.length === 1 || gameState.openFields.length === 2) {
+          const turnComputer = new TurnComputer(gameState, expectedScores, false);
           const avg = turnComputer.compute();
           expectedScores.set(key, avg);
           const currSize = expectedScores.size;

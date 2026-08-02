@@ -1,8 +1,9 @@
 import { beforeAll, describe, expect, test } from "bun:test";
-import { GameState, TurnComputer } from "./turn-computer";
+import { TurnComputer } from "./turn-computer";
+import { GameState } from "./types";
 
 const gameState: GameState = {
-  cappedUpperBonus: 0,
+  cappedUpperScore: 0,
   openFields: [
     "ones",
     "twos",
@@ -21,7 +22,7 @@ const gameState: GameState = {
 };
 
 describe("TurnComputer maps", () => {
-  const turnComputer = new TurnComputer(gameState, true);
+  const turnComputer = new TurnComputer(gameState, new Map(), true);
 
   beforeAll(() => {
     turnComputer.compute();
@@ -71,9 +72,10 @@ describe("example game states", () => {
   test("computes an average of 23.33 when only chance is open", () => {
     const turnComputer = new TurnComputer(
       {
-        cappedUpperBonus: 0,
+        cappedUpperScore: 0,
         openFields: ["chance"],
       },
+      new Map(),
       true,
     );
 
@@ -83,9 +85,10 @@ describe("example game states", () => {
   describe("with an upper bonus in reach", () => {
     const turnComputer = new TurnComputer(
       {
-        cappedUpperBonus: 56,
+        cappedUpperScore: 56,
         openFields: ["ones", "twos", "fullHouse"],
       },
+      new Map(),
       true,
     );
     let averageScore: number;
@@ -138,9 +141,10 @@ describe("example game states", () => {
   describe("with only the upper section open", () => {
     const turnComputer = new TurnComputer(
       {
-        cappedUpperBonus: 0,
+        cappedUpperScore: 0,
         openFields: ["ones", "twos", "threes", "fours", "fives", "sixes"],
       },
+      new Map(),
       true,
     );
 

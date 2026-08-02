@@ -1,25 +1,4 @@
-export const scoringKeys = [
-  "ones",
-  "twos",
-  "threes",
-  "fours",
-  "fives",
-  "sixes",
-  "threeOfAKind",
-  "fourOfAKind",
-  "fullHouse",
-  "smallStraight",
-  "largeStraight",
-  "yahtzee",
-  "chance"
-] as const;
-
-export type ScoringKey = typeof scoringKeys[number];
-
-export type GameState = {
-  cappedUpperBonus: number;
-  openFields: ScoringKey[];
-}
+import { GameState, gameStateToString, ScoringKey, scoringKeys } from "./types";
 
 function listSwaps(a: readonly number[], count: number) {
   const result: number[][] = [];
@@ -148,13 +127,15 @@ export class TurnComputer {
   expectations: Map<string, number>;
   recommendedSwap: Map<string, number[]>;
   fieldDistribution: Map<string, number>;
+  globalTurnExpectations: Map<string, number>;
   gameState: GameState;
 
-  constructor(gameState: GameState, recordTurnInfo: boolean) {
+  constructor(gameState: GameState, globalTurnExpectations: Map<string, number>, recordTurnInfo: boolean) {
     this.recordTurnInfo = recordTurnInfo;
     this.expectations = new Map();
     this.recommendedSwap = new Map();
     this.fieldDistribution = new Map();
+    this.globalTurnExpectations = globalTurnExpectations;
     this.gameState = gameState;
   }
 
@@ -164,13 +145,20 @@ export class TurnComputer {
     let bestKey: ScoringKey | null = null;
     for (const key of this.gameState.openFields) {
       let score = scoring[key](freqs);
-      if (this.gameState.cappedUpperBonus < 63 &&
-        ["ones", "twos", "threes", "fours", "fives", "sixes"].includes(key) &&
-        score + this.gameState.cappedUpperBonus >= 63
-      ) {
+      let nextUpperScore = this.gameState.cappedUpperScore;
+      if (["ones", "twos", "threes", "fours", "fives", "sixes"].includes(key)) {
+        nextUpperScore = Math.min(63, nextUpperScore + score);
+      }
+      if (this.gameState.cappedUpperScore < 63 && nextUpperScore >= 63) {
         score += 35;
       }
-      // todo: add exp for remaining turns
+      const nextGameState = {
+        openFields: this.gameState.openFields.filter(f => f !== key),
+        cappedUpperScore: nextUpperScore
+      };
+      const nextKey = gameStateToString(nextGameState);
+      // TODO: prefer to assert here, but that would break tests
+      score += this.globalTurnExpectations.get(nextKey) ?? 0;
 
       if (score > bestScore) {
         bestScore = score;

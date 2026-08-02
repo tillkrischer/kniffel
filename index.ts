@@ -1,25 +1,26 @@
-import { GameState, scoringKeys, TurnComputer } from "./turn-computer";
+import { TurnComputer } from "./turn-computer";
+import { GameState, scoringKeys } from "./types";
 
 const initialGameState1: GameState = {
-  cappedUpperBonus: 0,
+  cappedUpperScore: 0,
   openFields: [...scoringKeys],
 };
 const initialGameState2: GameState = {
-  cappedUpperBonus: 0,
+  cappedUpperScore: 0,
   openFields: ["ones", "twos", "threes", "fours", "fives", "sixes"],
 };
 const initialGameState3: GameState = {
-  cappedUpperBonus: 0,
+  cappedUpperScore: 0,
   openFields: ["chance"],
 };
 
 const initialGameState4: GameState = {
-  cappedUpperBonus: 56,
+  cappedUpperScore: 56,
   openFields: ["ones", "twos", "fullHouse"],
 };
 
 const initialGameState5: GameState = {
-  cappedUpperBonus: 60,
+  cappedUpperScore: 60,
   openFields: ["sixes"],
 };
 
@@ -31,7 +32,7 @@ const initialGameState5: GameState = {
 // turnComputer4.printTurnInfo([0, 3, 2, 0, 0, 0], 2);
 //
 
-const turnComputer5 = new TurnComputer(initialGameState5, true);
+const turnComputer5 = new TurnComputer(initialGameState5, new Map(), true);
 const avg5 = turnComputer5.compute();
 console.log("Average expected score when only sixes are open and bonus is in reach:", avg5);
 turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 0);
