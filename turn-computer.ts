@@ -160,7 +160,7 @@ export class TurnComputer {
 
   scoreTurn(freqs: number[], step: number) {
     if (this.gameState.openFields.length === 0) throw new Error("No open fields to score");
-    let bestScore = 0;
+    let bestScore = -Infinity;
     let bestKey: ScoringKey | null = null;
     for (const key of this.gameState.openFields) {
       let score = scoring[key](freqs);
