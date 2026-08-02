@@ -157,7 +157,7 @@ export class TurnComputer {
         cappedUpperScore: nextUpperScore
       };
       const nextKey = gameStateToString(nextGameState);
-      // TODO: prefer to assert here, but that would break tests
+      if (!this.globalTurnExpectations.has(nextKey)) throw new Error(`Missing global turn expectation for key: ${nextKey}`);
       score += this.globalTurnExpectations.get(nextKey) ?? 0;
 
       if (score > bestScore) {
@@ -189,7 +189,7 @@ export class TurnComputer {
     let totalScore = 0;
     let fieldsCount = this.recordTurnInfo ? initDistribution() : undefined;
     for (const freqs of combs) {
-      const count = factorial(swapCount) / swaps.reduce((acc, f) => acc * factorial(f), 1);
+      const count = factorial(swapCount) / freqs.reduce((acc, f) => acc * factorial(f), 1);
       const outcome = remaining.map((r, i) => r + freqs[i]);
 
       const key = `${step - 1}:${outcome.join("")}`;
@@ -256,13 +256,16 @@ export class TurnComputer {
     }
 
     let sum = 0;
+    let total = 0;
     for (const freqs of allCombs) {
       const key = `${2}:${freqs.join("")}`;
       const score = this.expectations.get(key) || 0;
-      sum += score;
+      const count = factorial(5) / freqs.reduce((acc, f) => acc * factorial(f), 1);
+      sum += count * score;
+      total += count;
     }
 
-    const avg = sum / allCombs.length;
+    const avg = sum / total;
     return avg;
   }
 
