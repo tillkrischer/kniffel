@@ -193,13 +193,13 @@ export class TurnComputer {
     }
   }
 
-  getSwapOutcome(step: number, freqs: number[], swaps: number[]): {score: number, fieldCounts: Record<ScoringKey, number>} {
+  getSwapOutcome(step: number, freqs: number[], swaps: number[]): {score: number, fieldsCount?: Record<ScoringKey, number>  } {
     const swapCount = swaps.reduce((acc, s) => acc + s, 0);
     const remaining = freqs.map((f, i) => f - swaps[i]);
     const combs = listCombinations(swapCount);
     let totalCount = 0;
     let totalScore = 0;
-    const fieldCounts = initDistribution();
+    let fieldsCount = this.recordTurnInfo ? initDistribution() : undefined;
     for (const freqs of combs) {
       const count = factorial(swapCount) / swaps.reduce((acc, f) => acc * factorial(f), 1);
       const outcome = remaining.map((r, i) => r + freqs[i]);
@@ -210,18 +210,20 @@ export class TurnComputer {
       totalCount += count;
       totalScore += score * count;
 
-      for (const k of scoringKeys) {
-        const distrKey = `${key}:${k}`;
-        if (!this.fieldDistribution.has(distrKey)) throw new Error(`Missing field distribution for key: ${distrKey}`);
-        const fieldCount = this.fieldDistribution.get(distrKey) || 0;
-        fieldCounts[k] += fieldCount * count;
+      if (this.recordTurnInfo && fieldsCount) {
+        for (const k of scoringKeys) {
+          const distrKey = `${key}:${k}`;
+          if (!this.fieldDistribution.has(distrKey)) throw new Error(`Missing field distribution for key: ${distrKey}`);
+          const fieldCount = this.fieldDistribution.get(distrKey) || 0;
+          fieldsCount[k] += fieldCount * count;
+        }
       }
     }
     const expectedScore = totalScore / totalCount;
 
     return {
       score: expectedScore,
-      fieldCounts
+      fieldsCount
     };
   }
 
@@ -231,16 +233,19 @@ export class TurnComputer {
     let bestFieldCounts: Record<ScoringKey, number> = initDistribution();
     let bestSwap: number[] = [];
     for (const swap of swaps) {
-      const {score, fieldCounts} = this.getSwapOutcome(step, freqs, swap);
+      const {score, fieldsCount} = this.getSwapOutcome(step, freqs, swap);
       if (score > bestScore) {
         bestScore = score;
-        bestFieldCounts = fieldCounts;
-        bestSwap = swap;
+        if (this.recordTurnInfo && fieldsCount) {
+          bestFieldCounts = fieldsCount;
+          bestSwap = swap;
+        }
       }
     }
 
     const key = `${step}:${freqs.join("")}`;
     this.expectations.set(key, bestScore);
+
     if (this.recordTurnInfo) {
       this.recommendedSwap.set(key, bestSwap);
       for (const k of scoringKeys) {
