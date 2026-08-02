@@ -121,7 +121,7 @@ describe("example game states", () => {
       const key = `${step}:000221`;
 
       expect(turnComputer.expectations.get(key)).toBeCloseTo(expectedScore);
-      expect(turnComputer.recommendedSwap.get(key)).toEqual(expectedSwap);
+      expect(turnComputer.recommendedSwap.get(key)).toEqual([...expectedSwap]);
       expect(turnComputer.fieldDistribution.get(`${key}:fours`)).toBe(expectedFields.fours);
       expect(turnComputer.fieldDistribution.get(`${key}:fives`)).toBe(expectedFields.fives);
       expect(turnComputer.fieldDistribution.get(`${key}:sixes`)).toBe(expectedFields.sixes);
