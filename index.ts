@@ -13,18 +13,61 @@ const initialGameState3: GameState = {
   openFields: ["chance"],
 };
 
-const turnComputer1 = new TurnComputer(initialGameState1, true);
-const avg = turnComputer1.compute();
-console.log("Average expected score for a full game:", avg);
-console.log("--------------------------------------------------");
+const initialGameState4: GameState = {
+  cappedUpperBonus: 56,
+  openFields: ["ones", "twos", "fullHouse"],
+};
 
-const turnComputer2 = new TurnComputer(initialGameState2, true);
-const avg2 = turnComputer2.compute();
-console.log("Average expected score when only upper section is open:", avg2);
-turnComputer2.printTurnInfo([0, 0, 0, 2, 2, 1], 1);
-console.log("--------------------------------------------------");
+const initialGameState5: GameState = {
+  cappedUpperBonus: 60,
+  openFields: ["sixes"],
+};
 
-const turnComputer3 = new TurnComputer(initialGameState3, true);
-const avg3 = turnComputer3.compute();
-console.log("Average expected score when only chance is open:", avg3);
+// const turnComputer4 = new TurnComputer(initialGameState4, true);
+// const avg4 = turnComputer4.compute();
+// console.log("Average expected score when only upper section and full house are open:", avg4);
+// turnComputer4.printTurnInfo([0, 3, 2, 0, 0, 0], 0);
+// turnComputer4.printTurnInfo([0, 3, 2, 0, 0, 0], 1);
+// turnComputer4.printTurnInfo([0, 3, 2, 0, 0, 0], 2);
+//
 
+const turnComputer5 = new TurnComputer(initialGameState5, true);
+const avg5 = turnComputer5.compute();
+console.log("Average expected score when only sixes are open and bonus is in reach:", avg5);
+turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 0);
+turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 1);
+turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 2);
+
+// const turnComputer1 = new TurnComputer(initialGameState1, true);
+// const avg = turnComputer1.compute();
+// console.log("Average expected score for a full game:", avg);
+// console.log("--------------------------------------------------");
+//
+// const turnComputer2 = new TurnComputer(initialGameState2, true);
+// const avg2 = turnComputer2.compute();
+// console.log("Average expected score when only upper section is open:", avg2);
+// turnComputer2.printTurnInfo([0, 0, 0, 2, 2, 1], 1);
+// console.log("--------------------------------------------------");
+//
+// const turnComputer3 = new TurnComputer(initialGameState3, true);
+// const avg3 = turnComputer3.compute();
+// console.log("Average expected score when only chance is open:", avg3);
+
+// let start = performance.now();
+// let turnComputer = new TurnComputer(initialGameState1, false);
+// for (let i = 0; i < 20; i++) {
+//   turnComputer.compute();
+// }
+// let end = performance.now();
+// console.log(`Average expected score for a full game: ${turnComputer.compute()}`);
+// console.log(`Time taken for 20 computations: ${(end - start).toFixed(2)} ms`);
+//
+//
+// start = performance.now();
+// turnComputer = new TurnComputer(initialGameState1, true);
+// for (let i = 0; i < 20; i++) {
+//   turnComputer.compute();
+// }
+// end = performance.now();
+// console.log(`Average expected score for a full game: ${turnComputer.compute()}`);
+// console.log(`Time taken for 20 computations: ${(end - start).toFixed(2)} ms`);
