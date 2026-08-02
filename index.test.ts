@@ -80,6 +80,61 @@ describe("example game states", () => {
     expect(turnComputer.compute()).toBeCloseTo(23.33, 2);
   });
 
+  describe("with an upper bonus in reach", () => {
+    const turnComputer = new TurnComputer(
+      {
+        cappedUpperBonus: 56,
+        openFields: ["ones", "twos", "fullHouse"],
+      },
+      true,
+    );
+    let averageScore: number;
+
+    beforeAll(() => {
+      averageScore = turnComputer.compute();
+    });
+
+    test("computes an average of 16.34", () => {
+      expect(averageScore).toBeCloseTo(16.34, 2);
+    });
+
+    test.each([
+      {
+        step: 0,
+        expectedScore: 25,
+        expectedSwap: [0, 0, 0, 0, 0, 0],
+        expectedFields: { ones: 0, twos: 0, fullHouse: 1 },
+      },
+      {
+        step: 1,
+        expectedScore: 25,
+        expectedSwap: [0, 0, 0, 0, 0, 0],
+        expectedFields: { ones: 0, twos: 0, fullHouse: 1 },
+      },
+      {
+        step: 2,
+        expectedScore: 28.503401360544217,
+        expectedSwap: [0, 0, 2, 0, 0, 0],
+        expectedFields: { ones: 0, twos: 351, fullHouse: 105 },
+      },
+    ])("records the result for 032000 at step $step", ({
+      step,
+      expectedScore,
+      expectedSwap,
+      expectedFields,
+    }) => {
+      const key = `${step}:032000`;
+
+      expect(turnComputer.expectations.get(key)).toBeCloseTo(expectedScore);
+      expect(turnComputer.recommendedSwap.get(key)).toEqual([...expectedSwap]);
+      expect(turnComputer.fieldDistribution.get(`${key}:ones`)).toBe(expectedFields.ones);
+      expect(turnComputer.fieldDistribution.get(`${key}:twos`)).toBe(expectedFields.twos);
+      expect(turnComputer.fieldDistribution.get(`${key}:fullHouse`)).toBe(
+        expectedFields.fullHouse,
+      );
+    });
+  });
+
   describe("with only the upper section open", () => {
     const turnComputer = new TurnComputer(
       {
