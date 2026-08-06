@@ -1,0 +1,311 @@
+import { scoringCategories, scoringKeys, scoringLabels, type GameState, type ScoringKey } from "../types";
+import type { TurnRecommendation } from "../turn-computer";
+import type { WorkerResponse } from "./messages";
+
+const STORAGE_KEY = "kniffel-game-state-v1";
+const dieCharacters = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+
+type StoredState = {
+  cappedUpperScore: number;
+  openFields: ScoringKey[];
+};
+
+const elements = {
+  fieldGroups: getElement<HTMLDivElement>("field-groups"),
+  openCount: getElement<HTMLElement>("open-count"),
+  upperRange: getElement<HTMLInputElement>("upper-score-range"),
+  upperInput: getElement<HTMLInputElement>("upper-score-input"),
+  upperOutput: getElement<HTMLOutputElement>("upper-score-output"),
+  reset: getElement<HTMLButtonElement>("reset-state"),
+  diceInputs: getElement<HTMLDivElement>("dice-inputs"),
+  analyze: getElement<HTMLButtonElement>("analyze"),
+  buttonLabel: document.querySelector<HTMLSpanElement>("#analyze .button-label")!,
+  formError: getElement<HTMLParagraphElement>("form-error"),
+  result: getElement<HTMLElement>("result"),
+  resultTitle: getElement<HTMLHeadingElement>("result-title"),
+  resultDetail: getElement<HTMLParagraphElement>("result-detail"),
+  resultDice: getElement<HTMLDivElement>("result-dice"),
+  expectedScore: getElement<HTMLElement>("expected-score"),
+  recommendedField: getElement<HTMLElement>("recommended-field"),
+  recommendedFieldMetric: getElement<HTMLElement>("recommended-field-metric"),
+  probabilityList: getElement<HTMLDivElement>("probability-list"),
+};
+
+let state = loadState();
+let solverReady = false;
+let requestId = 0;
+let activeRequestId = 0;
+let isCalculating = false;
+
+const solverWorker = new Worker("/solver-worker.js", { type: "module" });
+
+function getElement<T extends HTMLElement>(id: string): T {
+  const element = document.getElementById(id);
+  if (!element) throw new Error(`Missing element #${id}`);
+  return element as T;
+}
+
+function loadState(): StoredState {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null") as Partial<StoredState> | null;
+    if (
+      parsed &&
+      Number.isInteger(parsed.cappedUpperScore) &&
+      parsed.cappedUpperScore! >= 0 &&
+      parsed.cappedUpperScore! <= 63 &&
+      Array.isArray(parsed.openFields) &&
+      parsed.openFields.every((field) => scoringKeys.includes(field as ScoringKey))
+    ) {
+      return {
+        cappedUpperScore: parsed.cappedUpperScore!,
+        openFields: scoringKeys.filter((key) => parsed.openFields!.includes(key)),
+      };
+    }
+  } catch {
+    // Ignore malformed local data and return the default state.
+  }
+  return { cappedUpperScore: 0, openFields: [...scoringKeys] };
+}
+
+function saveState(): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function renderFields(): void {
+  elements.fieldGroups.replaceChildren();
+  for (const section of ["upper", "lower"] as const) {
+    const group = document.createElement("section");
+    group.className = "field-group";
+    const heading = document.createElement("h3");
+    heading.textContent = section === "upper" ? "Upper section" : "Lower section";
+    group.append(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "field-grid";
+    for (const category of scoringCategories.filter((item) => item.section === section)) {
+      const isOpen = state.openFields.includes(category.key);
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `field-button ${isOpen ? "is-open" : "is-filled"}`;
+      button.dataset.field = category.key;
+      button.setAttribute("aria-pressed", String(!isOpen));
+      button.setAttribute(
+        "aria-label",
+        `${category.label}: ${isOpen ? "open" : "filled"}. Mark as ${isOpen ? "filled" : "open"}`,
+      );
+
+      const name = document.createElement("span");
+      name.className = "field-name";
+      name.textContent = category.label;
+      const status = document.createElement("span");
+      status.className = "field-status";
+      status.textContent = isOpen ? "Open" : "✓ Filled";
+      button.append(name, status);
+      button.addEventListener("click", () => toggleField(category.key));
+      grid.append(button);
+    }
+    group.append(grid);
+    elements.fieldGroups.append(group);
+  }
+  elements.openCount.textContent = String(state.openFields.length);
+}
+
+function toggleField(field: ScoringKey): void {
+  state.openFields = state.openFields.includes(field)
+    ? state.openFields.filter((key) => key !== field)
+    : scoringKeys.filter((key) => key === field || state.openFields.includes(key));
+  saveState();
+  renderFields();
+  invalidateResult();
+}
+
+function renderDiceInputs(): void {
+  for (let index = 0; index < 5; index++) {
+    const wrapper = document.createElement("label");
+    wrapper.className = "die-input";
+    const accessibleLabel = document.createElement("span");
+    accessibleLabel.className = "sr-only";
+    accessibleLabel.textContent = `Die ${index + 1}`;
+    const select = document.createElement("select");
+    select.dataset.die = String(index);
+    select.setAttribute("aria-label", `Die ${index + 1}`);
+    const placeholder = new Option("–", "");
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.add(placeholder);
+    dieCharacters.forEach((character, dieIndex) => {
+      select.add(new Option(character, String(dieIndex + 1)));
+    });
+    select.addEventListener("change", invalidateResult);
+    wrapper.append(accessibleLabel, select);
+    elements.diceInputs.append(wrapper);
+  }
+}
+
+function updateUpperScore(value: number): void {
+  const capped = Math.max(0, Math.min(63, Number.isFinite(value) ? Math.round(value) : 0));
+  state.cappedUpperScore = capped;
+  elements.upperRange.value = String(capped);
+  elements.upperInput.value = String(capped);
+  elements.upperOutput.value = `${capped} / 63`;
+  saveState();
+  invalidateResult();
+}
+
+function getDice(): number[] | null {
+  const values = [...elements.diceInputs.querySelectorAll("select")].map((select) => Number(select.value));
+  return values.every((value) => Number.isInteger(value) && value >= 1 && value <= 6) ? values : null;
+}
+
+function getRerollsRemaining(): number {
+  return Number(document.querySelector<HTMLInputElement>('input[name="rerolls"]:checked')!.value);
+}
+
+function invalidateResult(): void {
+  activeRequestId = ++requestId;
+  isCalculating = false;
+  elements.result.hidden = true;
+  elements.formError.hidden = true;
+  updateAnalyzeButton();
+}
+
+function updateAnalyzeButton(): void {
+  elements.analyze.disabled = !solverReady || isCalculating;
+  elements.buttonLabel.textContent = isCalculating
+    ? "Calculating…"
+    : solverReady
+      ? "Calculate best move"
+      : "Loading strategy…";
+}
+
+function analyze(): void {
+  const dice = getDice();
+  if (!dice) {
+    elements.formError.textContent = "Choose a value for all five dice.";
+    elements.formError.hidden = false;
+    return;
+  }
+  if (state.openFields.length === 0) {
+    elements.formError.textContent = "Mark at least one scoring field as open.";
+    elements.formError.hidden = false;
+    return;
+  }
+
+  elements.formError.hidden = true;
+  elements.result.hidden = true;
+  isCalculating = true;
+  updateAnalyzeButton();
+  activeRequestId = ++requestId;
+  const gameState: GameState = {
+    cappedUpperScore: state.cappedUpperScore,
+    openFields: [...state.openFields],
+  };
+  solverWorker.postMessage({
+    type: "analyze",
+    id: activeRequestId,
+    gameState,
+    dice,
+    throwsRemaining: getRerollsRemaining(),
+  });
+}
+
+function renderResult(recommendation: TurnRecommendation): void {
+  const dice = getDice();
+  if (!dice) return;
+  const rerolls = new Set(recommendation.rerollDiceIndices);
+  const throwsRemaining = getRerollsRemaining();
+
+  elements.resultDice.replaceChildren();
+  dice.forEach((die, index) => {
+    const item = document.createElement("div");
+    item.className = `result-die ${rerolls.has(index) ? "reroll" : "keep"}`;
+    item.innerHTML = `<span aria-hidden="true">${dieCharacters[die - 1]}</span><small>${rerolls.has(index) ? "Reroll" : "Keep"}</small>`;
+    elements.resultDice.append(item);
+  });
+
+  if (throwsRemaining === 0) {
+    const field = recommendation.recommendedField;
+    elements.resultTitle.textContent = field ? `Score ${scoringLabels[field]}` : "Score this roll";
+    elements.resultDetail.textContent = "No rerolls remain. Use the strongest available scoring field.";
+  } else if (rerolls.size === 0) {
+    elements.resultTitle.textContent = "Keep all five dice";
+    elements.resultDetail.textContent = "This roll is stronger than any available reroll.";
+  } else {
+    elements.resultTitle.textContent = `Reroll ${rerolls.size} ${rerolls.size === 1 ? "die" : "dice"}`;
+    const keptDice = dice.filter((_, index) => !rerolls.has(index));
+    elements.resultDetail.textContent = keptDice.length
+      ? `Keep ${keptDice.join(", ")} and reroll the highlighted ${rerolls.size === 1 ? "die" : "dice"}.`
+      : "Reroll all five dice.";
+  }
+
+  elements.expectedScore.textContent = recommendation.expectedScore.toFixed(2);
+  elements.recommendedFieldMetric.hidden = !recommendation.recommendedField;
+  elements.recommendedField.textContent = recommendation.recommendedField
+    ? scoringLabels[recommendation.recommendedField]
+    : "—";
+
+  elements.probabilityList.replaceChildren();
+  const probabilities = Object.entries(recommendation.fieldProbabilities)
+    .map(([key, probability]) => [key as ScoringKey, probability || 0] as const)
+    .sort((a, b) => b[1] - a[1]);
+  for (const [field, probability] of probabilities) {
+    const row = document.createElement("div");
+    row.className = "probability-row";
+    const percentage = `${(probability * 100).toFixed(probability < 0.001 ? 2 : 1)}%`;
+    row.innerHTML = `
+      <span>${scoringLabels[field]}</span>
+      <span class="probability-track"><i style="width: ${Math.max(0, Math.min(100, probability * 100))}%"></i></span>
+      <strong>${percentage}</strong>
+    `;
+    elements.probabilityList.append(row);
+  }
+  elements.result.hidden = false;
+  elements.result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+solverWorker.addEventListener("message", (event: MessageEvent<WorkerResponse>) => {
+  const response = event.data;
+  if (response.type === "ready") {
+    solverReady = true;
+    updateAnalyzeButton();
+    return;
+  }
+  if (response.type === "error") {
+    if (response.id !== undefined && response.id !== activeRequestId) return;
+    isCalculating = false;
+    elements.formError.textContent = response.message;
+    elements.formError.hidden = false;
+    updateAnalyzeButton();
+    return;
+  }
+  if (response.id !== activeRequestId) return;
+  isCalculating = false;
+  updateAnalyzeButton();
+  renderResult(response.recommendation);
+});
+
+solverWorker.addEventListener("error", () => {
+  solverReady = false;
+  isCalculating = false;
+  elements.formError.textContent = "The strategy engine could not be loaded. Refresh and try again.";
+  elements.formError.hidden = false;
+  updateAnalyzeButton();
+});
+
+elements.upperRange.addEventListener("input", () => updateUpperScore(Number(elements.upperRange.value)));
+elements.upperInput.addEventListener("change", () => updateUpperScore(Number(elements.upperInput.value)));
+elements.reset.addEventListener("click", () => {
+  state = { cappedUpperScore: 0, openFields: [...scoringKeys] };
+  saveState();
+  updateUpperScore(0);
+  renderFields();
+});
+elements.analyze.addEventListener("click", analyze);
+document.querySelectorAll<HTMLInputElement>('input[name="rerolls"]').forEach((input) => {
+  input.addEventListener("change", invalidateResult);
+});
+
+renderFields();
+renderDiceInputs();
+updateUpperScore(state.cappedUpperScore);
+updateAnalyzeButton();

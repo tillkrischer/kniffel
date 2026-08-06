@@ -16,6 +16,30 @@ export const scoringKeys = [
 
 export type ScoringKey = typeof scoringKeys[number];
 
+export const scoringCategories: readonly {
+  key: ScoringKey;
+  label: string;
+  section: "upper" | "lower";
+}[] = [
+  { key: "ones", label: "Ones", section: "upper" },
+  { key: "twos", label: "Twos", section: "upper" },
+  { key: "threes", label: "Threes", section: "upper" },
+  { key: "fours", label: "Fours", section: "upper" },
+  { key: "fives", label: "Fives", section: "upper" },
+  { key: "sixes", label: "Sixes", section: "upper" },
+  { key: "threeOfAKind", label: "Three of a kind", section: "lower" },
+  { key: "fourOfAKind", label: "Four of a kind", section: "lower" },
+  { key: "fullHouse", label: "Full house", section: "lower" },
+  { key: "smallStraight", label: "Small straight", section: "lower" },
+  { key: "largeStraight", label: "Large straight", section: "lower" },
+  { key: "yahtzee", label: "Kniffel", section: "lower" },
+  { key: "chance", label: "Chance", section: "lower" },
+];
+
+export const scoringLabels = Object.fromEntries(
+  scoringCategories.map(({ key, label }) => [key, label]),
+) as Record<ScoringKey, string>;
+
 export type GameState = {
   cappedUpperScore: number;
   openFields: ScoringKey[];

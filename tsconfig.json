@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
     "noEmit": true,
-    "types": ["bun"]
+    "types": ["bun"],
+    "lib": ["ESNext", "DOM"],
+    "strict": true,
+    "module": "Preserve",
+    "moduleResolution": "bundler"
   }
 }

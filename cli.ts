@@ -20,14 +20,16 @@ const throwNumber = parseInt(throwInput, 10);
 
 const diceInput = await rl.question("Enter dice (33445): ");
 const diceArray = diceInput.split("").map((d) => parseInt(d, 10));
-const freq = diceArray.reduce((acc, d) => {
-  acc[d-1] = (acc[d-1] || 0) + 1;
-  return acc;
-}, [0, 0, 0, 0, 0, 0]);
 
 rl.close();
 
 
 const turnComputer = new TurnComputer(gameState, expectedScores, true);
 turnComputer.compute();
-turnComputer.printTurnInfo(freq, throwNumber);
+const recommendation = turnComputer.getRecommendation(diceArray, throwNumber);
+
+console.log(`Expected score: ${recommendation.expectedScore}`);
+console.log(`Recommended swap: ${recommendation.rerollCounts}`);
+for (const key of gameState.openFields) {
+  console.log(`Field ${key}: ${recommendation.fieldProbabilities[key] || 0}`);
+}

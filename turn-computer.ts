@@ -105,6 +105,26 @@ const scoring: Record<ScoringKey, (freqs: number[]) => number> = {
   },
 }
 
+export type TurnRecommendation = {
+  expectedScore: number;
+  rerollCounts: number[];
+  rerollDiceIndices: number[];
+  recommendedField: ScoringKey | null;
+  fieldProbabilities: Partial<Record<ScoringKey, number>>;
+};
+
+export function diceToFrequencies(dice: readonly number[]): number[] {
+  if (dice.length !== 5 || dice.some((die) => !Number.isInteger(die) || die < 1 || die > 6)) {
+    throw new Error("Dice must contain exactly five values between 1 and 6");
+  }
+
+  const frequencies = [0, 0, 0, 0, 0, 0];
+  for (const die of dice) {
+    frequencies[die - 1]++;
+  }
+  return frequencies;
+}
+
 function initDistribution(): Record<ScoringKey, number> {
   return {
     ones: 0,
@@ -185,12 +205,12 @@ export class TurnComputer {
     }
   }
 
-  getSwapOutcome(step: number, freqs: number, swaps: number): {score: number, fieldsCount?: Record<ScoringKey, number>  } {
+  getSwapOutcome(step: number, freqs: number, swaps: number): {score: number, fieldProbabilities?: Record<ScoringKey, number>  } {
     const swapCount = numberSize(swaps);
     const remaining = freqs - swaps;
     let totalCount = 0;
     let totalScore = 0;
-    let fieldsCount = this.recordTurnInfo ? initDistribution() : undefined;
+    const fieldProbabilities = this.recordTurnInfo ? initDistribution() : undefined;
 
     const [start, stop] = getCombinationNumbersRange(swapCount);
     for (let i = start; i < stop; i++) {
@@ -205,20 +225,26 @@ export class TurnComputer {
       totalCount += count;
       totalScore += score * count;
 
-      if (this.recordTurnInfo && fieldsCount) {
+      if (this.recordTurnInfo && fieldProbabilities) {
         for (const k of scoringKeys) {
           const distrKey = `${step - 1}:${numberToArray(outcome).join("")}:${k}`;
           if (!this.fieldDistribution.has(distrKey)) throw new Error(`Missing field distribution for key: ${distrKey}`);
-          const fieldCount = this.fieldDistribution.get(distrKey) || 0;
-          fieldsCount[k] += fieldCount * count;
+          const fieldProbability = this.fieldDistribution.get(distrKey) || 0;
+          fieldProbabilities[k] += fieldProbability * count;
         }
       }
     }
     const expectedScore = totalScore / totalCount;
 
+    if (fieldProbabilities) {
+      for (const key of scoringKeys) {
+        fieldProbabilities[key] /= totalCount;
+      }
+    }
+
     return {
       score: expectedScore,
-      fieldsCount
+      fieldProbabilities,
     };
   }
 
@@ -228,11 +254,11 @@ export class TurnComputer {
     let bestFieldCounts: Record<ScoringKey, number> = initDistribution();
     let bestSwap: number[] = [];
     for (const swap of swaps) {
-      const {score, fieldsCount} = this.getSwapOutcome(step, freqs, arrayToNumber(swap));
+      const {score, fieldProbabilities} = this.getSwapOutcome(step, freqs, arrayToNumber(swap));
       if (score > bestScore) {
         bestScore = score;
-        if (this.recordTurnInfo && fieldsCount) {
-          bestFieldCounts = fieldsCount;
+        if (this.recordTurnInfo && fieldProbabilities) {
+          bestFieldCounts = fieldProbabilities;
           bestSwap = swap;
         }
       }
@@ -277,6 +303,53 @@ export class TurnComputer {
 
     const avg = sum / total;
     return avg;
+  }
+
+  getRecommendation(dice: readonly number[], throwsRemaining: number): TurnRecommendation {
+    if (!this.recordTurnInfo) {
+      throw new Error("Turn information was not recorded");
+    }
+    if (!Number.isInteger(throwsRemaining) || throwsRemaining < 0 || throwsRemaining > 2) {
+      throw new Error("Throws remaining must be 0, 1, or 2");
+    }
+
+    const frequencies = diceToFrequencies(dice);
+    const key = `${throwsRemaining}:${frequencies.join("")}`;
+    const expectedScore = this.expectations.get(key);
+    const rerollCounts = this.recommendedSwap.get(key);
+
+    if (expectedScore === undefined || !rerollCounts) {
+      throw new Error("Compute must be called before requesting a recommendation");
+    }
+
+    const remainingRerolls = [...rerollCounts];
+    const rerollDiceIndices: number[] = [];
+    dice.forEach((die, index) => {
+      if (remainingRerolls[die - 1] > 0) {
+        rerollDiceIndices.push(index);
+        remainingRerolls[die - 1]--;
+      }
+    });
+
+    const fieldProbabilities: Partial<Record<ScoringKey, number>> = {};
+    let recommendedField: ScoringKey | null = null;
+    let highestProbability = -1;
+    for (const field of this.gameState.openFields) {
+      const probability = this.fieldDistribution.get(`${key}:${field}`) || 0;
+      fieldProbabilities[field] = probability;
+      if (probability > highestProbability) {
+        highestProbability = probability;
+        recommendedField = field;
+      }
+    }
+
+    return {
+      expectedScore,
+      rerollCounts: [...rerollCounts],
+      rerollDiceIndices,
+      recommendedField,
+      fieldProbabilities,
+    };
   }
 
   printTurnInfo(freqs: number[], step: number) {

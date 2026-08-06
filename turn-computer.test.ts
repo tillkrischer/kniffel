@@ -61,10 +61,14 @@ describe("TurnComputer maps", () => {
 
     expect(turnComputer.expectations.get(key)).toBeCloseTo(25.13888888888889);
     expect(turnComputer.recommendedSwap.get(key)).toEqual([0, 0, 0, 1, 1, 0]);
-    expect(turnComputer.fieldDistribution.get(`${key}:threeOfAKind`)).toBe(3);
-    expect(turnComputer.fieldDistribution.get(`${key}:smallStraight`)).toBe(9);
-    expect(turnComputer.fieldDistribution.get(`${key}:largeStraight`)).toBe(2);
-    expect(turnComputer.fieldDistribution.get(`${key}:chance`)).toBe(22);
+    expect(turnComputer.fieldDistribution.get(`${key}:threeOfAKind`)).toBeCloseTo(3 / 36);
+    expect(turnComputer.fieldDistribution.get(`${key}:smallStraight`)).toBeCloseTo(9 / 36);
+    expect(turnComputer.fieldDistribution.get(`${key}:largeStraight`)).toBeCloseTo(2 / 36);
+    expect(turnComputer.fieldDistribution.get(`${key}:chance`)).toBeCloseTo(22 / 36);
+
+    const recommendation = turnComputer.getRecommendation([4, 4, 5, 5, 6], 1);
+    expect(recommendation.rerollDiceIndices).toEqual([0, 2]);
+    expect(Object.values(recommendation.fieldProbabilities).reduce((sum, value) => sum + value, 0)).toBeCloseTo(1);
   });
 });
 
@@ -120,7 +124,7 @@ describe("example game states", () => {
         step: 2,
         expectedScore: 27.87037037037037,
         expectedSwap: [0, 0, 2, 0, 0, 0],
-        expectedFields: { ones: 0, twos: 681, fullHouse: 105 },
+        expectedFields: { ones: 0, twos: 0.7839506172839505, fullHouse: 0.21604938271604934 },
       },
     ])("records the result for 032000 at step $step", ({
       step,
@@ -132,9 +136,9 @@ describe("example game states", () => {
 
       expect(turnComputer.expectations.get(key)).toBeCloseTo(expectedScore);
       expect(turnComputer.recommendedSwap.get(key)).toEqual([...expectedSwap]);
-      expect(turnComputer.fieldDistribution.get(`${key}:ones`)).toBe(expectedFields.ones);
-      expect(turnComputer.fieldDistribution.get(`${key}:twos`)).toBe(expectedFields.twos);
-      expect(turnComputer.fieldDistribution.get(`${key}:fullHouse`)).toBe(
+      expect(turnComputer.fieldDistribution.get(`${key}:ones`)).toBeCloseTo(expectedFields.ones);
+      expect(turnComputer.fieldDistribution.get(`${key}:twos`)).toBeCloseTo(expectedFields.twos);
+      expect(turnComputer.fieldDistribution.get(`${key}:fullHouse`)).toBeCloseTo(
         expectedFields.fullHouse,
       );
     });
@@ -166,13 +170,13 @@ describe("example game states", () => {
         step: 1,
         expectedScore: 12.657407407407407,
         expectedSwap: [0, 0, 0, 2, 0, 1],
-        expectedFields: { fours: 1, fives: 202, sixes: 13 },
+        expectedFields: { fours: 0.004629629629629629, fives: 0.9351851851851852, sixes: 0.06018518518518518 },
       },
       {
         step: 2,
         expectedScore: 14.842463991769543,
         expectedSwap: [0, 0, 0, 2, 0, 1],
-        expectedFields: { fours: 159, fives: 25_225, sixes: 4_047 },
+        expectedFields: { fours: 0.007265946502057613, fives: 0.9021347736625513, sixes: 0.09059927983539094 },
       },
     ])("records the result for 000221 at step $step", ({
       step,
@@ -184,9 +188,9 @@ describe("example game states", () => {
 
       expect(turnComputer.expectations.get(key)).toBeCloseTo(expectedScore);
       expect(turnComputer.recommendedSwap.get(key)).toEqual([...expectedSwap]);
-      expect(turnComputer.fieldDistribution.get(`${key}:fours`)).toBe(expectedFields.fours);
-      expect(turnComputer.fieldDistribution.get(`${key}:fives`)).toBe(expectedFields.fives);
-      expect(turnComputer.fieldDistribution.get(`${key}:sixes`)).toBe(expectedFields.sixes);
+      expect(turnComputer.fieldDistribution.get(`${key}:fours`)).toBeCloseTo(expectedFields.fours);
+      expect(turnComputer.fieldDistribution.get(`${key}:fives`)).toBeCloseTo(expectedFields.fives);
+      expect(turnComputer.fieldDistribution.get(`${key}:sixes`)).toBeCloseTo(expectedFields.sixes);
     });
   });
 });
