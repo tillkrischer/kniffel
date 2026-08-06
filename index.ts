@@ -1,5 +1,5 @@
-import { TurnComputer } from "./turn-computer";
-import { GameState, scoringKeys } from "./types";
+import { GameState, gameStateToNumber, scoringKeys } from "./types";
+import { promises as fs } from "node:fs";
 
 const initialGameState1: GameState = {
   cappedUpperScore: 0,
@@ -24,6 +24,20 @@ const initialGameState5: GameState = {
   openFields: ["sixes"],
 };
 
+const buffer = await fs.readFile("expected-scores.bin");
+const expectedScores = new Float64Array(buffer.buffer, buffer.byteOffset, buffer.byteLength / Float64Array.BYTES_PER_ELEMENT);
+
+// for (let i = 0; i <= 63; i++) {
+//   const gameState: GameState = {
+//     cappedUpperScore: i,
+//     openFields: ["ones", "twos"],
+//   };
+//   const key = gameStateToNumber(gameState);
+//   console.log(`Expected score for cappedUpperScore=${i} and all upper section open: ${expectedScores[key]}`);
+// }
+
+console.log("Average expected score for a full game:", expectedScores[gameStateToNumber(initialGameState1)]);
+
 // const turnComputer4 = new TurnComputer(initialGameState4, true);
 // const avg4 = turnComputer4.compute();
 // console.log("Average expected score when only upper section and full house are open:", avg4);
@@ -32,12 +46,16 @@ const initialGameState5: GameState = {
 // turnComputer4.printTurnInfo([0, 3, 2, 0, 0, 0], 2);
 //
 
-const turnComputer5 = new TurnComputer(initialGameState5, new Map(), true);
-const avg5 = turnComputer5.compute();
-console.log("Average expected score when only sixes are open and bonus is in reach:", avg5);
-turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 0);
-turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 1);
-turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 2);
+// console.log("availableParallelism:", availableParallelism());
+
+
+
+// const turnComputer5 = new TurnComputer(initialGameState5, new Float64Array(), true);
+// const avg5 = turnComputer5.compute();
+// console.log("Average expected score when only sixes are open and bonus is in reach:", avg5);
+// turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 0);
+// turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 1);
+// turnComputer5.printTurnInfo([0, 3, 2, 0, 0, 0], 2);
 
 // const turnComputer1 = new TurnComputer(initialGameState1, true);
 // const avg = turnComputer1.compute();

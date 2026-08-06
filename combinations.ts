@@ -1,3 +1,5 @@
+import { ScoringKey, scoringKeys } from "./types";
+
 export const combinationNumbers: number[] = []
 export const combinationCounts: number[] = []
 
@@ -77,4 +79,24 @@ export function numberSize(num: number): number {
     ((num >> 9) & 7) +
     ((num >> 12) & 7) +
     ((num >> 15) & 7);
+}
+
+export function getBoardStates(target: number) {
+  const result: ScoringKey[][] = [];
+  const stack: [{ prefix: ScoringKey[], index: number, count: number }] = [{ prefix: [], index: 0, count: 0 }];
+  while (stack.length > 0) {
+    const { prefix, index, count } = stack.pop()!;
+    if (index >= 13) {
+      if (count === target) {
+        result.push(prefix);
+      }
+      continue;
+    }
+    if (13 - index < target - count) {
+      continue;
+    }
+    stack.push({ prefix: [...prefix, scoringKeys[index]], index: index + 1, count: count + 1 });
+    stack.push({ prefix: [...prefix], index: index + 1, count: count });
+  }
+  return result;
 }
