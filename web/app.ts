@@ -121,23 +121,26 @@ function toggleField(field: ScoringKey): void {
 
 function renderDiceInputs(): void {
   for (let index = 0; index < 5; index++) {
-    const wrapper = document.createElement("label");
+    const wrapper = document.createElement("div");
     wrapper.className = "die-input";
-    const accessibleLabel = document.createElement("span");
-    accessibleLabel.className = "sr-only";
-    accessibleLabel.textContent = `Die ${index + 1}`;
-    const select = document.createElement("select");
-    select.dataset.die = String(index);
-    select.setAttribute("aria-label", `Die ${index + 1}`);
-    const placeholder = new Option("–", "");
-    placeholder.disabled = true;
-    placeholder.selected = true;
-    select.add(placeholder);
-    dieCharacters.forEach((character, dieIndex) => {
-      select.add(new Option(character, String(dieIndex + 1)));
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.die = String(index);
+    button.dataset.value = "0";
+    button.textContent = "–";
+    button.setAttribute("aria-label", `Die ${index + 1}: not set. Click to set to 1`);
+    button.addEventListener("click", () => {
+      const currentValue = Number(button.dataset.value);
+      const nextValue = currentValue >= 6 ? 1 : currentValue + 1;
+      button.dataset.value = String(nextValue);
+      button.textContent = dieCharacters[nextValue - 1];
+      button.setAttribute(
+        "aria-label",
+        `Die ${index + 1}: ${nextValue}. Click to set to ${nextValue === 6 ? 1 : nextValue + 1}`,
+      );
+      invalidateResult();
     });
-    select.addEventListener("change", invalidateResult);
-    wrapper.append(accessibleLabel, select);
+    wrapper.append(button);
     elements.diceInputs.append(wrapper);
   }
 }
@@ -153,7 +156,9 @@ function updateUpperScore(value: number): void {
 }
 
 function getDice(): number[] | null {
-  const values = [...elements.diceInputs.querySelectorAll("select")].map((select) => Number(select.value));
+  const values = [...elements.diceInputs.querySelectorAll<HTMLButtonElement>("button")].map(
+    (button) => Number(button.dataset.value),
+  );
   return values.every((value) => Number.isInteger(value) && value >= 1 && value <= 6) ? values : null;
 }
 
