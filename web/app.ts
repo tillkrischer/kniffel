@@ -37,7 +37,7 @@ let requestId = 0;
 let activeRequestId = 0;
 let isCalculating = false;
 
-const solverWorker = new Worker("/solver-worker.js", { type: "module" });
+const solverWorker = new Worker(new URL("./solver-worker.js", import.meta.url), { type: "module" });
 
 function getElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
