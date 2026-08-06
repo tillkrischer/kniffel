@@ -42,3 +42,27 @@ export function gameStateToNumber(gameState: GameState): number {
 
   return num | (gameState.cappedUpperScore << 13);
 }
+
+export function stringToGameState(str: string): GameState {
+  const split = str.split(":");
+  if (split.length !== 2) {
+    throw new Error(`Invalid game state string: ${str}`);
+  }
+  const [key, cappedUpperScoreStr] = split;
+  const cappedUpperScore = parseInt(cappedUpperScoreStr, 10);
+  if (isNaN(cappedUpperScore) || cappedUpperScore < 0 || cappedUpperScore > 63) {
+    throw new Error(`Invalid capped upper score: ${cappedUpperScoreStr}`);
+  }
+
+  if (key.length !== 13 || !/^[01]+$/.test(key)) {
+    throw new Error(`Invalid open fields key: ${key}`);
+  }
+  const openFields: ScoringKey[] = [];
+  for (let i = 0; i <= 12; i++) {
+    if (key[i] === "1") {
+      openFields.push(scoringKeys[i]);
+    }
+  }
+
+  return { cappedUpperScore, openFields };
+}
