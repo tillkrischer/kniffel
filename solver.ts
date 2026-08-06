@@ -1,5 +1,5 @@
 import { TurnComputer } from "./turn-computer";
-import { gameStateToString, ScoringKey, scoringKeys } from "./types";
+import { gameStateToNumber, ScoringKey, scoringKeys } from "./types";
 
 function getBoardStates(target: number) {
   const result: ScoringKey[][] = [];
@@ -23,7 +23,8 @@ function getBoardStates(target: number) {
 
 
 function solve() {
-  const expectedScores = new Map<string, number>();
+  const expectedScores = new Float64Array(2 ** 13 * 64);
+  let computedCount = 0;
 
   for (let i = 0; i <= 13; i++) {
     const boardStates = getBoardStates(i);
@@ -33,19 +34,20 @@ function solve() {
           cappedUpperScore,
           openFields: boardState,
         };
-        const key = gameStateToString(gameState);
+        const key = gameStateToNumber(gameState);
         if (gameState.openFields.length === 0) {
-          expectedScores.set(key, 0);
+          expectedScores[key] = 0;
+          computedCount++;
           continue;
         }
 
         if (gameState.openFields.length === 1 || gameState.openFields.length === 2) {
           const turnComputer = new TurnComputer(gameState, expectedScores, false);
           const avg = turnComputer.compute();
-          expectedScores.set(key, avg);
-          const currSize = expectedScores.size;
-          if (currSize % 10 === 0) {
-            console.log(`Computed expected scores for ${currSize} game states...`);
+          expectedScores[key] = avg;
+          computedCount++;
+          if (computedCount % 10 === 0) {
+            console.log(`Computed expected scores for ${computedCount} game states...`);
           }
         }
       }

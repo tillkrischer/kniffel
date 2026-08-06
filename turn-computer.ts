@@ -1,5 +1,5 @@
 import { arrayToNumber, combinationCounts, combinationNumbers, getCombinationNumbersRange, numberSize, numberToArray } from "./combinations";
-import { GameState, gameStateToString, ScoringKey, scoringKeys } from "./types";
+import { GameState, gameStateToNumber, ScoringKey, scoringKeys } from "./types";
 
 function listSwaps(a: readonly number[], count: number) {
   const result: number[][] = [];
@@ -129,10 +129,11 @@ export class TurnComputer {
   fastExpectations: Map<number, number>;
   recommendedSwap: Map<string, number[]>;
   fieldDistribution: Map<string, number>;
-  globalTurnExpectations: Map<string, number>;
+  // globalTurnExpectations: Map<string, number>;
+  globalTurnExpectations: Float64Array;
   gameState: GameState;
 
-  constructor(gameState: GameState, globalTurnExpectations: Map<string, number>, recordTurnInfo: boolean) {
+  constructor(gameState: GameState, globalTurnExpectations: Float64Array, recordTurnInfo: boolean) {
     this.recordTurnInfo = recordTurnInfo;
     this.fastExpectations = new Map();
     this.expectations = new Map();
@@ -159,9 +160,8 @@ export class TurnComputer {
         openFields: this.gameState.openFields.filter(f => f !== key),
         cappedUpperScore: nextUpperScore
       };
-      const nextKey = gameStateToString(nextGameState);
-      if (!this.globalTurnExpectations.has(nextKey)) throw new Error(`Missing global turn expectation for key: ${nextKey}`);
-      score += this.globalTurnExpectations.get(nextKey) ?? 0;
+      const nextKey = gameStateToNumber(nextGameState);
+      score += this.globalTurnExpectations[nextKey] || 0;
 
       if (score > bestScore) {
         bestScore = score;

@@ -30,3 +30,15 @@ export function gameStateToString(gameState: GameState): string {
 
   return `${key}:${gameState.cappedUpperScore}`;
 }
+
+export function gameStateToNumber(gameState: GameState): number {
+  let num = 0;
+
+  for (let i = 0; i <= 12; i++) {
+    if (gameState.openFields.includes(scoringKeys[i])) {
+      num |= (1 << i);
+    }
+  }
+
+  return num | (gameState.cappedUpperScore << 13);
+}
