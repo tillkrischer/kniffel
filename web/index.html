@@ -2,135 +2,71 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4efe4" />
-    <meta
-      name="description"
-      content="A focused Kniffel strategy helper for choosing which dice to keep and where to score."
-    />
-    <title>Kniffel Move</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#f5f4f0" />
+    <meta name="description" content="Your next Kniffel move. Set your scorecard, enter your dice, and find the best play." />
+    <title>Kniffel — Next move</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="./" aria-label="Kniffel Move home">
-        <span class="brand-mark" aria-hidden="true">⚄</span>
-        <span>Kniffel Move</span>
-      </a>
-      <p>One roll. One clear move.</p>
-    </header>
-
-    <main>
-      <section class="hero" aria-labelledby="hero-title">
-        <div>
-          <p class="eyebrow">Strategy assistant</p>
-          <h1 id="hero-title">What should you do with this roll?</h1>
-          <p class="hero-copy">
-            Tell us what is still open, enter your dice, and get the
-            mathematically strongest move.
-          </p>
-        </div>
-        <div class="hero-dice" aria-hidden="true">
-          <span>⚁</span><span>⚅</span><span>⚃</span>
-        </div>
-      </section>
-
-      <div class="workspace">
-        <section class="panel game-panel" aria-labelledby="game-state-title">
-          <div class="panel-heading">
-            <div>
-              <p class="step-label">Step 1</p>
-              <h2 id="game-state-title">Set your game state</h2>
-            </div>
-            <button class="text-button" id="reset-state" type="button">Reset</button>
+    <div class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="./" aria-label="Kniffel home"><span class="brand-mark" aria-hidden="true">⁙</span>kniffel<span class="brand-dot">.</span></a>
+      </header>
+      <main>
+        <section class="scorecard" aria-labelledby="scorecard-title">
+          <div class="section-heading">
+            <h1 id="scorecard-title">Scorecard <span class="count"><span id="open-count">13</span> open</span></h1>
+            <button class="text-button" id="reset-state" type="button" aria-label="Reset scorecard">↺ <span>Reset</span></button>
           </div>
-
-          <div class="upper-score">
-            <div class="score-heading">
-              <label for="upper-score-input">Upper-section sum</label>
-              <output id="upper-score-output" for="upper-score-range">0 / 63</output>
-            </div>
-            <div class="score-inputs">
-              <input id="upper-score-range" type="range" min="0" max="63" value="0" />
-              <input
-                id="upper-score-input"
-                class="number-input"
-                type="number"
-                min="0"
-                max="63"
-                value="0"
-                inputmode="numeric"
-                aria-label="Capped upper-section sum"
-              />
-            </div>
-            <p>Only progress toward the 63-point bonus matters here.</p>
-          </div>
-
-          <div class="field-summary" aria-live="polite">
-            <span><strong id="open-count">13</strong> fields open</span>
-            <span class="legend"><i></i> Click a field to mark it filled</span>
-          </div>
+          <p class="section-hint">Tap filled fields to cross them off.</p>
           <div id="field-groups" class="field-groups"></div>
-        </section>
-
-        <section class="panel move-panel" aria-labelledby="roll-title">
-          <div class="panel-heading">
-            <div>
-              <p class="step-label">Step 2</p>
-              <h2 id="roll-title">Enter your roll</h2>
+          <div class="upper-score">
+            <div class="score-heading"><label for="upper-score-input">Upper total</label><span>Bonus at 63</span></div>
+            <div class="score-inputs">
+              <input id="upper-score-range" type="range" min="0" max="63" value="0" aria-label="Upper total toward bonus" />
+              <div class="score-number"><input id="upper-score-input" type="number" min="0" max="63" value="0" inputmode="numeric" /><span>/ 63</span></div>
             </div>
+            <output id="upper-score-output" class="sr-only" for="upper-score-range">0 / 63</output>
           </div>
-
-          <fieldset class="rerolls-fieldset">
-            <legend>Rerolls remaining</legend>
-            <div class="segmented-control">
-              <label><input type="radio" name="rerolls" value="2" checked /><span>Two</span></label>
-              <label><input type="radio" name="rerolls" value="1" /><span>One</span></label>
-              <label><input type="radio" name="rerolls" value="0" /><span>None</span></label>
-            </div>
-          </fieldset>
-
-          <fieldset class="dice-fieldset">
-            <legend>Five dice</legend>
-            <div class="dice-inputs" id="dice-inputs"></div>
-          </fieldset>
-
-          <p id="form-error" class="form-error" role="alert" hidden></p>
-          <button class="primary-button" id="analyze" type="button" disabled>
-            <span class="button-label">Loading strategy…</span>
-            <span aria-hidden="true">→</span>
-          </button>
-
-          <section id="result" class="result" aria-live="polite" hidden>
-            <div class="result-kicker">Best move</div>
-            <h3 id="result-title"></h3>
-            <p id="result-detail" class="result-detail"></p>
-            <div id="result-dice" class="result-dice"></div>
-
-            <div class="metric-row">
-              <div class="metric">
-                <span>Expected remaining value</span>
-                <strong id="expected-score"></strong>
-              </div>
-              <div class="metric" id="recommended-field-metric">
-                <span>Most likely score field</span>
-                <strong id="recommended-field"></strong>
-              </div>
-            </div>
-
-            <details class="probabilities">
-              <summary>Scoring field probabilities</summary>
-              <div id="probability-list"></div>
-            </details>
-            <p class="result-note">
-              Expected value includes this turn and all fields that remain afterward.
-            </p>
-          </section>
         </section>
-      </div>
-    </main>
 
-    <footer>Built for fast decisions at the table.</footer>
+        <section class="roll-card" aria-labelledby="roll-title">
+          <div class="section-heading roll-heading">
+            <h2 id="roll-title">Your roll</h2>
+            <fieldset class="rerolls-fieldset">
+              <legend>Rerolls left</legend>
+              <div class="segmented-control">
+                <label><input type="radio" name="rerolls" value="2" checked /><span>2</span></label>
+                <label><input type="radio" name="rerolls" value="1" /><span>1</span></label>
+                <label><input type="radio" name="rerolls" value="0" /><span>0</span></label>
+              </div>
+            </fieldset>
+          </div>
+          <div class="dice-inputs" id="dice-inputs" role="group" aria-label="Your five dice"></div>
+          <div class="dice-picker" id="dice-picker" role="group" aria-label="Choose a die value" hidden></div>
+          <p class="dice-hint" id="dice-hint">Tap a die to set its value.</p>
+          <p id="form-error" class="form-error" role="alert" hidden></p>
+          <button class="primary-button" id="analyze" type="button" disabled><span class="button-label">Loading strategy…</span><span aria-hidden="true">↗</span></button>
+        </section>
+
+        <section id="result" class="result" aria-live="polite" aria-labelledby="result-title" hidden>
+          <div class="result-kicker"><span class="status-dot"></span>Best move</div>
+          <h2 id="result-title"></h2>
+          <p id="result-detail" class="sr-only"></p>
+          <div id="result-dice" class="result-dice"></div>
+          <details class="insights">
+            <summary>Move details <span aria-hidden="true">＋</span></summary>
+            <div class="metric-row">
+              <div class="metric"><span>Expected points remaining</span><strong id="expected-score"></strong></div>
+              <div class="metric" id="recommended-field-metric"><span>Likely scoring field</span><strong id="recommended-field"></strong></div>
+            </div>
+            <p class="result-note">Includes this turn and all remaining fields.</p>
+            <div class="probabilities"><h3>Scoring probabilities</h3><div id="probability-list"></div></div>
+          </details>
+        </section>
+      </main>
+    </div>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

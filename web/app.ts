@@ -3,7 +3,13 @@ import type { TurnRecommendation } from "../turn-computer";
 import type { WorkerResponse } from "./messages";
 
 const STORAGE_KEY = "kniffel-game-state-v1";
-const dieCharacters = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+const pipPositions = [[5], [1, 9], [1, 5, 9], [1, 3, 7, 9], [1, 3, 5, 7, 9], [1, 3, 4, 6, 7, 9]];
+
+function dieFace(value: number): string {
+  return '<span class="die-face" aria-hidden="true">' + pipPositions[value - 1].map((position) =>
+    '<i class="pip" style="grid-area: ' + Math.ceil(position / 3) + ' / ' + ((position - 1) % 3 + 1) + '"></i>'
+  ).join("") + '</span>';
+}
 
 type StoredState = {
   cappedUpperScore: number;
@@ -18,6 +24,8 @@ const elements = {
   upperOutput: getElement<HTMLOutputElement>("upper-score-output"),
   reset: getElement<HTMLButtonElement>("reset-state"),
   diceInputs: getElement<HTMLDivElement>("dice-inputs"),
+  dicePicker: getElement<HTMLDivElement>("dice-picker"),
+  diceHint: getElement<HTMLParagraphElement>("dice-hint"),
   analyze: getElement<HTMLButtonElement>("analyze"),
   buttonLabel: document.querySelector<HTMLSpanElement>("#analyze .button-label")!,
   formError: getElement<HTMLParagraphElement>("form-error"),
@@ -36,6 +44,7 @@ let solverReady = false;
 let requestId = 0;
 let activeRequestId = 0;
 let isCalculating = false;
+let selectedDie: HTMLButtonElement | null = null;
 
 const solverWorker = new Worker(new URL("./solver-worker.js", import.meta.url), { type: "module" });
 
@@ -76,9 +85,7 @@ function renderFields(): void {
   for (const section of ["upper", "lower"] as const) {
     const group = document.createElement("section");
     group.className = "field-group";
-    const heading = document.createElement("h3");
-    heading.textContent = section === "upper" ? "Upper section" : "Lower section";
-    group.append(heading);
+    group.setAttribute("aria-label", section === "upper" ? "Upper section" : "Lower section");
 
     const grid = document.createElement("div");
     grid.className = "field-grid";
@@ -96,10 +103,18 @@ function renderFields(): void {
 
       const name = document.createElement("span");
       name.className = "field-name";
-      name.textContent = category.label;
+      if (section === "upper") {
+        name.innerHTML = dieFace(scoringKeys.indexOf(category.key) + 1);
+      } else {
+        const shortLabels: Partial<Record<ScoringKey, string>> = {
+          threeOfAKind: "3 of a kind", fourOfAKind: "4 of a kind",
+        };
+        name.textContent = shortLabels[category.key] || category.label;
+      }
       const status = document.createElement("span");
       status.className = "field-status";
-      status.textContent = isOpen ? "Open" : "✓ Filled";
+      status.textContent = isOpen ? "" : "✓";
+      status.setAttribute("aria-hidden", "true");
       button.append(name, status);
       button.addEventListener("click", () => toggleField(category.key));
       grid.append(button);
@@ -119,6 +134,26 @@ function toggleField(field: ScoringKey): void {
   invalidateResult();
 }
 
+function closeDicePicker(): void {
+  selectedDie?.setAttribute("aria-expanded", "false");
+  selectedDie = null;
+  elements.dicePicker.hidden = true;
+  elements.diceHint.textContent = "Tap a die to set its value.";
+}
+
+function selectDie(button: HTMLButtonElement): void {
+  selectedDie?.setAttribute("aria-expanded", "false");
+  selectedDie = button;
+  button.setAttribute("aria-expanded", "true");
+  elements.dicePicker.hidden = false;
+  const index = Number(button.dataset.die) + 1;
+  elements.dicePicker.setAttribute("aria-label", "Choose value for die " + index);
+  elements.diceHint.textContent = "Choose a value for die " + index + ".";
+  elements.dicePicker.querySelectorAll<HTMLButtonElement>("button").forEach((option) => {
+    option.setAttribute("aria-pressed", String(option.dataset.value === button.dataset.value));
+  });
+}
+
 function renderDiceInputs(): void {
   for (let index = 0; index < 5; index++) {
     const wrapper = document.createElement("div");
@@ -127,23 +162,54 @@ function renderDiceInputs(): void {
     button.type = "button";
     button.dataset.die = String(index);
     button.dataset.value = "0";
-    button.textContent = "–";
-    button.setAttribute("aria-label", `Die ${index + 1}: not set. Click to set to 1`);
+    button.innerHTML = '<span class="empty-die" aria-hidden="true">+</span>';
+    button.setAttribute("aria-label", "Die " + (index + 1) + ": not set. Choose value");
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-controls", "dice-picker");
     button.addEventListener("click", () => {
-      const currentValue = Number(button.dataset.value);
-      const nextValue = currentValue >= 6 ? 1 : currentValue + 1;
-      button.dataset.value = String(nextValue);
-      button.textContent = dieCharacters[nextValue - 1];
-      button.setAttribute(
-        "aria-label",
-        `Die ${index + 1}: ${nextValue}. Click to set to ${nextValue === 6 ? 1 : nextValue + 1}`,
-      );
-      invalidateResult();
+      if (selectedDie === button) closeDicePicker();
+      else selectDie(button);
     });
     wrapper.append(button);
     elements.diceInputs.append(wrapper);
   }
+  for (let value = 1; value <= 6; value++) {
+    const option = document.createElement("button");
+    option.type = "button";
+    option.dataset.value = String(value);
+    option.innerHTML = dieFace(value);
+    option.setAttribute("aria-label", String(value));
+    option.addEventListener("click", () => {
+      if (!selectedDie) return;
+      const button = selectedDie;
+      button.dataset.value = String(value);
+      button.innerHTML = dieFace(value);
+      button.setAttribute("aria-label", "Die " + (Number(button.dataset.die) + 1) + ": " + value + ". Choose value");
+      invalidateResult();
+      // Advance through unset dice, then return focus to the die just edited.
+      const next = elements.diceInputs.querySelector<HTMLButtonElement>('button[data-value="0"]');
+      if (next) {
+        selectDie(next);
+        elements.dicePicker.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+      } else {
+        closeDicePicker();
+        button.focus({ preventScroll: true });
+      }
+    });
+    elements.dicePicker.append(option);
+  }
 }
+
+document.addEventListener("click", (event) => {
+  const target = event.target as Node;
+  if (!elements.diceInputs.contains(target) && !elements.dicePicker.contains(target)) closeDicePicker();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && selectedDie) {
+    selectedDie.focus({ preventScroll: true });
+    closeDicePicker();
+  }
+});
 
 function updateUpperScore(value: number): void {
   const capped = Math.max(0, Math.min(63, Number.isFinite(value) ? Math.round(value) : 0));
@@ -179,7 +245,7 @@ function updateAnalyzeButton(): void {
   elements.buttonLabel.textContent = isCalculating
     ? "Calculating…"
     : solverReady
-      ? "Calculate best move"
+      ? "Find best move"
       : "Loading strategy…";
 }
 
@@ -224,7 +290,8 @@ function renderResult(recommendation: TurnRecommendation): void {
   dice.forEach((die, index) => {
     const item = document.createElement("div");
     item.className = `result-die ${rerolls.has(index) ? "reroll" : "keep"}`;
-    item.innerHTML = `<span aria-hidden="true">${dieCharacters[die - 1]}</span><small>${rerolls.has(index) ? "Reroll" : "Keep"}</small>`;
+    item.innerHTML = `${dieFace(die)}<small>${rerolls.has(index) ? "Reroll" : "Keep"}</small>`;
+    item.setAttribute("aria-label", `Die ${index + 1}: ${die}, ${rerolls.has(index) ? "reroll" : "keep"}`);
     elements.resultDice.append(item);
   });
 
@@ -233,7 +300,7 @@ function renderResult(recommendation: TurnRecommendation): void {
     elements.resultTitle.textContent = field ? `Score ${scoringLabels[field]}` : "Score this roll";
     elements.resultDetail.textContent = "No rerolls remain. Use the strongest available scoring field.";
   } else if (rerolls.size === 0) {
-    elements.resultTitle.textContent = "Keep all five dice";
+    elements.resultTitle.textContent = "Keep all five";
     elements.resultDetail.textContent = "This roll is stronger than any available reroll.";
   } else {
     elements.resultTitle.textContent = `Reroll ${rerolls.size} ${rerolls.size === 1 ? "die" : "dice"}`;
@@ -265,7 +332,7 @@ function renderResult(recommendation: TurnRecommendation): void {
     elements.probabilityList.append(row);
   }
   elements.result.hidden = false;
-  elements.result.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  elements.result.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
 }
 
 solverWorker.addEventListener("message", (event: MessageEvent<WorkerResponse>) => {
